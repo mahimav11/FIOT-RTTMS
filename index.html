@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT Environment Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4285f4;
+      --danger: #ea4335;
+      --warning: #fbbc05;
+      --success: #34a853;
+      --dark: #202124;
+      --light: #f8f9fa;
+      --gray: #5f6368;
+    }
+    
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f5f7fa;
+      color: var(--dark);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    header {
+      background-color: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header-left h1 {
+      margin: 0;
+      color: var(--primary);
+      font-weight: 500;
+      font-size: 24px;
+    }
+    
+    .header-left p {
+      margin: 5px 0 0;
+      color: var(--gray);
+      font-size: 14px;
+    }
+    
+    .connection-status {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      background: #f1f3f4;
+      padding: 8px 12px;
+      border-radius: 20px;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    
+    .status-dot.connected {
+      background-color: var(--success);
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.disconnected {
+      background-color: var(--danger);
+    }
+    
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .gauges-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    
+    .gauge-card {
+      background-color: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      text-align: center;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .gauge-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 10px;
+      color: var(--dark);
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .gauge-container {
+      flex-grow: 1;
+      position: relative;
+      margin: 5px 0;
+    }
+    
+    .gauge-value-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      width: 100%;
+      z-index: 10;
+    }
+    
+    .gauge-value {
+      font-size: 28px;
+      font-weight: 500;
+      line-height: 1;
+    }
+    
+    .offline-value {
+      color: var(--gray);
+      opacity: 0.7;
+    }
+    
+    .gauge-unit {
+      font-size: 14px;
+      color: var(--gray);
+      margin-top: 5px;
+    }
+    
+    .status-section {
+      background-color: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .status-title {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 15px;
+      color: var(--dark);
+    }
+    
+    .device-status {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-grow: 1;
+    }
+    
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    
+    .status-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .status-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+    
+    .status-name {
+      font-weight: 500;
+      font-size: 14px;
+    }
+    
+    .status-state {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .status-on {
+      background-color: rgba(52, 168, 83, 0.1);
+      color: var(--success);
+    }
+    
+    .status-off {
+      background-color: rgba(234, 67, 53, 0.1);
+      color: var(--danger);
+    }
+    
+    .phone-input {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 6px 8px;
+      width: 120px;
+      text-align: right;
+      font-size: 12px;
+    }
+    
+    .alerts-section {
+      grid-column: span 2;
+      background-color: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-top: 15px;
+    }
+    
+    .alerts-title {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 10px;
+      color: var(--dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .alert-item {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .alert-critical {
+      background-color: rgba(234, 67, 53, 0.1);
+      border-left: 3px solid var(--danger);
+    }
+    
+    .alert-warning {
+      background-color: rgba(251, 188, 5, 0.1);
+      border-left: 3px solid var(--warning);
+    }
+    
+    .alert-icon {
+      font-size: 16px;
+    }
+    
+    .critical-icon {
+      color: var(--danger);
+    }
+    
+    .warning-icon {
+      color: var(--warning);
+    }
+    
+    .alert-message {
+      flex-grow: 1;
+      font-size: 14px;
+    }
+    
+    .alert-time {
+      font-size: 11px;
+      color: var(--gray);
+      white-space: nowrap;
+      margin-left: 5px;
+    }
+    
+    .last-updated {
+      font-size: 12px;
+      color: var(--gray);
+      text-align: right;
+      margin-top: 10px;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+    
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .gauges-section {
+        grid-template-columns: 1fr;
+      }
+      
+      .alerts-section {
+        grid-column: span 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-left">
+        <h1>Environment Monitoring Dashboard</h1>
+        <p>Real-time data from ESP8266 sensors</p>
+      </div>
+      <div class="connection-status">
+        <div class="status-dot" id="connection-dot"></div>
+        <span id="connection-status">Connecting...</span>
+      </div>
+    </header>
+    
+    <div class="dashboard-grid">
+      <div class="gauges-section">
+        <div class="gauge-card">
+          <div class="gauge-title">Temperature</div>
+          <div class="gauge-container" id="temp-gauge">
+            <div class="gauge-value-container">
+              <div class="gauge-value" id="temp-value">--</div>
+              <div class="gauge-unit">°C</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="gauge-card">
+          <div class="gauge-title">Humidity</div>
+          <div class="gauge-container" id="hum-gauge">
+            <div class="gauge-value-container">
+              <div class="gauge-value" id="hum-value">--</div>
+              <div class="gauge-unit">% RH</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="gauge-card">
+          <div class="gauge-title">Air Quality</div>
+          <div class="gauge-container" id="gas-gauge">
+            <div class="gauge-value-container">
+              <div class="gauge-value" id="gas-value">--</div>
+              <div class="gauge-unit">PPM</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="gauge-card">
+          <div class="gauge-title">Danger Level</div>
+          <div class="gauge-container" id="danger-gauge">
+            <div class="gauge-value-container">
+              <div class="gauge-value" id="danger-value">--</div>
+              <div class="gauge-unit">Risk %</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="status-section">
+        <div class="status-title">Device Status</div>
+        <div class="device-status">
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-fan"></i></div>
+              <div class="status-name">Cooling Fan</div>
+            </div>
+            <div class="status-state status-off" id="fan-status">OFF</div>
+          </div>
+          
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-bell"></i></div>
+              <div class="status-name">Buzzer Alarm</div>
+            </div>
+            <div class="status-state status-off" id="buzzer-status">OFF</div>
+          </div>
+          
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-lightbulb" style="color: #ea4335;"></i></div>
+              <div class="status-name">Red LED</div>
+            </div>
+            <div class="status-state status-off" id="red-led-status">OFF</div>
+          </div>
+          
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-lightbulb" style="color: #34a853;"></i></div>
+              <div class="status-name">Green LED</div>
+            </div>
+            <div class="status-state status-off" id="green-led-status">OFF</div>
+          </div>
+          
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-lightbulb" style="color: #fbbc05;"></i></div>
+              <div class="status-name">Yellow LED</div>
+            </div>
+            <div class="status-state status-off" id="yellow-led-status">OFF</div>
+          </div>
+          
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-sms"></i></div>
+              <div class="status-name">SMS Alerts</div>
+            </div>
+            <div class="status-state status-off" id="sms-status">INACTIVE</div>
+          </div>
+          
+          <div class="status-item">
+            <div class="status-info">
+              <div class="status-icon"><i class="fas fa-phone"></i></div>
+              <div class="status-name">Alert Phone</div>
+            </div>
+            <input type="text" id="alert-phone" class="phone-input" placeholder="+1234567890">
+          </div>
+        </div>
+      </div>
+      
+      <div class="alerts-section">
+        <div class="alerts-title">
+          <i class="fas fa-exclamation-triangle"></i> Alert History
+        </div>
+        <div id="alerts-container">
+          <div class="alert-item alert-warning">
+            <i class="fas fa-info-circle warning-icon alert-icon"></i>
+            <div class="alert-message">System initialized. Waiting for data...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="last-updated">
+      Last updated: <span id="last-updated">--:--:--</span>
+    </div>
+  </div>
+
+  <script>
+    // Firebase configuration - REPLACE WITH YOUR ACTUAL CONFIG
+    // Initialize Firebase (make sure this matches your project)
+const firebaseConfig = {
+  apiKey: "AIzaSyA1a...", // Your actual API key
+  authDomain: "real-time-temp-mmv1.firebaseapp.com",
+  databaseURL: "https://real-time-temp-mmv1-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "real-time-temp-mmv1",
+  storageBucket: "real-time-temp-mmv1.appspot.com",
+  messagingSenderId: "769438979552",
+  appId: "1:769438979552:web:..." // Your actual app ID
+};
+
+// Initialize Firebase
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+
+const database = firebase.database();
+
+// Real-time listener with error handling
+function startDataListening() {
+  database.ref('sensor').on('value', (snapshot) => {
+    const data = snapshot.val();
+    console.log("New data received:", data); // Debug log
+    
+    if (data) {
+      updateDashboard(data);
+    } else {
+      console.warn("No data received");
+      showPlaceholderValues();
+    }
+  }, (error) => {
+    console.error("Firebase error:", error);
+    showErrorState();
+  });
+}
+
+function updateDashboard(data) {
+  // Update numeric values
+  document.getElementById('temp-value').textContent = data.temperature.toFixed(1);
+  document.getElementById('hum-value').textContent = data.humidity.toFixed(1);
+  document.getElementById('gas-value').textContent = data.gas;
+  
+  // Update last updated time
+  document.getElementById('last-updated').textContent = 
+    new Date().toLocaleTimeString();
+  
+  // Update gauges
+  if (window.tempGauge) tempGauge.updateSeries([data.temperature]);
+  if (window.humGauge) humGauge.updateSeries([data.humidity]);
+  if (window.gasGauge) gasGauge.updateSeries([data.gas]);
+  
+  // Calculate and update danger level
+  const dangerLevel = calculateDangerLevel(data.temperature, data.gas);
+  document.getElementById('danger-value').textContent = dangerLevel;
+  if (window.dangerGauge) dangerGauge.updateSeries([dangerLevel]);
+  
+  // Update device status indicators
+  updateDeviceStatus(data);
+}
+
+function calculateDangerLevel(temp, gas) {
+  let level = 0;
+  if (temp > 30) level += 30;
+  if (temp > 35) level += 30;
+  if (gas > 300) level += 20;
+  if (gas > 500) level += 20;
+  return Math.min(100, level);
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  initGauges();
+  startDataListening();
+  
+  // Load saved phone number
+  const savedPhone = localStorage.getItem('alertPhoneNumber');
+  if (savedPhone) {
+    document.getElementById('alert-phone').value = savedPhone;
+  }
+});
+    
+    function initGauges() {
+      const gaugeOptions = {
+        chart: {
+          type: 'radialBar',
+          height: '100%',
+          animations: {
+            enabled: true,
+            easing: 'easeout',
+            speed: 800
+          }
+        },
+        plotOptions: {
+          radialBar: {
+            startAngle: -135,
+            endAngle: 135,
+            hollow: {
+              size: '60%',
+            },
+            track: {
+              background: '#f1f3f4',
+              strokeWidth: '100%',
+              margin: 0,
+            },
+            dataLabels: {
+              name: {
+                show: false
+              },
+              value: {
+                show: true,
+                fontSize: '16px',
+                fontFamily: 'Roboto, sans-serif',
+                fontWeight: 'bold',
+                offsetY: 0,
+                color: '#202124',
+                formatter: function (val) {
+                  return val.toFixed(val % 1 === 0 ? 0 : 1);
+                }
+              }
+            }
+          }
+        },
+        stroke: {
+          lineCap: 'round'
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'dark',
+            shadeIntensity: 0.15,
+            inverseColors: false,
+            opacityFrom: 1,
+            opacityTo: 1,
+          }
+        }
+      };
+      
+      // Temperature Gauge
+      tempGauge = new ApexCharts(document.querySelector("#temp-gauge"), {
+        ...gaugeOptions,
+        series: [0],
+        fill: {
+          ...gaugeOptions.fill,
+          gradient: {
+            ...gaugeOptions.fill.gradient,
+            stops: [0, 50, 65, 91],
+            colorStops: [
+              { offset: 0, color: '#34a853' },
+              { offset: 50, color: '#fbbc05' },
+              { offset: 65, color: '#fbbc05' },
+              { offset: 91, color: '#ea4335' }
+            ]
+          }
+        },
+        min: 0,
+        max: 50
+      });
+      tempGauge.render();
+      
+      // Humidity Gauge
+      humGauge = new ApexCharts(document.querySelector("#hum-gauge"), {
+        ...gaugeOptions,
+        series: [0],
+        fill: {
+          ...gaugeOptions.fill,
+          gradient: {
+            ...gaugeOptions.fill.gradient,
+            stops: [0, 100],
+            colorStops: [
+              { offset: 0, color: '#f1f3f4' },
+              { offset: 100, color: '#4285f4' }
+            ]
+          }
+        },
+        min: 0,
+        max: 100
+      });
+      humGauge.render();
+      
+      // Gas Gauge
+      gasGauge = new ApexCharts(document.querySelector("#gas-gauge"), {
+        ...gaugeOptions,
+        series: [0],
+        fill: {
+          ...gaugeOptions.fill,
+          gradient: {
+            ...gaugeOptions.fill.gradient,
+            stops: [0, 50, 80, 100],
+            colorStops: [
+              { offset: 0, color: '#34a853' },
+              { offset: 50, color: '#fbbc05' },
+              { offset: 80, color: '#ea4335' }
+            ]
+          }
+        },
+        min: 0,
+        max: 1000
+      });
+      gasGauge.render();
+      
+      // Danger Level Gauge
+      dangerGauge = new ApexCharts(document.querySelector("#danger-gauge"), {
+        ...gaugeOptions,
+        series: [0],
+        fill: {
+          ...gaugeOptions.fill,
+          gradient: {
+            ...gaugeOptions.fill.gradient,
+            stops: [0, 50, 100],
+            colorStops: [
+              { offset: 0, color: '#f1f3f4' },
+              { offset: 50, color: '#fbbc05' },
+              { offset: 100, color: '#ea4335' }
+            ]
+          }
+        },
+        min: 0,
+        max: 100
+      });
+      dangerGauge.render();
+    }
+    
+    function setupFirebaseListeners() {
+      // Connection state monitoring
+      database.ref('.info/connected').on('value', (snapshot) => {
+        const isConnected = snapshot.val();
+        const dot = document.getElementById('connection-dot');
+        const status = document.getElementById('connection-status');
+        
+        if (isConnected) {
+          dot.classList.add('connected');
+          dot.classList.remove('disconnected');
+          status.textContent = 'Connected';
+          
+          // Update UI if reconnected
+          if (!lastConnectedState && lastData) {
+            updateUI(lastData, false);
+          }
+        } else {
+          dot.classList.add('disconnected');
+          dot.classList.remove('connected');
+          status.textContent = 'Disconnected';
+          
+          // Show offline status if data exists
+          if (lastData) {
+            updateUI(lastData, true);
+          }
+        }
+        
+        lastConnectedState = isConnected;
+      });
+      
+      // Sensor data listener
+      database.ref('sensor').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          lastData = data;
+          updateUI(data, false);
+        }
+      });
+      
+      // Device status listener
+      database.ref('devices').on('value', (snapshot) => {
+        const deviceData = snapshot.val();
+        if (deviceData) {
+          updateDeviceStatus(deviceData, false);
+        }
+      });
+    }
+    
+    function updateUI(data, isDisconnected) {
+      const now = new Date();
+      
+      // Update last updated time
+      document.getElementById('last-updated').textContent = now.toLocaleTimeString() + 
+        (isDisconnected ? ' (Offline)' : '');
+      
+      // Update values with disconnected styling if needed
+      const temp = parseFloat(data.temperature) || 0;
+      const hum = parseFloat(data.humidity) || 0;
+      const gas = parseInt(data.gas) || 0;
+      
+      document.getElementById('temp-value').textContent = temp.toFixed(1);
+      document.getElementById('hum-value').textContent = hum.toFixed(1);
+      document.getElementById('gas-value').textContent = gas;
+      
+      // Apply disconnected styling if needed
+      if (isDisconnected) {
+        document.getElementById('temp-value').classList.add('offline-value');
+        document.getElementById('hum-value').classList.add('offline-value');
+        document.getElementById('gas-value').classList.add('offline-value');
+        document.getElementById('danger-value').classList.add('offline-value');
+      } else {
+        document.getElementById('temp-value').classList.remove('offline-value');
+        document.getElementById('hum-value').classList.remove('offline-value');
+        document.getElementById('gas-value').classList.remove('offline-value');
+        document.getElementById('danger-value').classList.remove('offline-value');
+      }
+      
+      // Update gauges
+      tempGauge.updateSeries([temp]);
+      humGauge.updateSeries([hum]);
+      gasGauge.updateSeries([gas]);
+      
+      // Calculate danger level (0-100)
+      let dangerLevel = 0;
+      if (temp > 30) dangerLevel += 30;
+      if (temp > 35) dangerLevel += 30;
+      if (gas > 300) dangerLevel += 20;
+      if (gas > 500) dangerLevel += 20;
+      dangerLevel = Math.min(100, dangerLevel);
+      
+      document.getElementById('danger-value').textContent = dangerLevel;
+      dangerGauge.updateSeries([dangerLevel]);
+      
+      // Update device status
+      updateDeviceStatus(data, isDisconnected);
+      
+      // Check for alerts
+      if (!isDisconnected) {
+        checkAlerts(data, now);
+      }
+    }
+    
+    function updateDeviceStatus(data, isDisconnected) {
+      // Fan status
+      const fanStatus = (isDisconnected ? false : (data.fan_status || data.temperature > 30));
+      updateStatusElement('fan-status', fanStatus);
+      
+      // Buzzer status
+      const buzzerStatus = (isDisconnected ? false : (data.buzzer_status || data.temperature > 35));
+      updateStatusElement('buzzer-status', buzzerStatus);
+      
+      // LED statuses
+      const redLedStatus = (isDisconnected ? false : (data.red_led || data.temperature > 35));
+      updateStatusElement('red-led-status', redLedStatus);
+      
+      const greenLedStatus = (isDisconnected ? false : (data.green_led || data.temperature <= 30));
+      updateStatusElement('green-led-status', greenLedStatus);
+      
+      const yellowLedStatus = (isDisconnected ? false : (data.yellow_led || (data.temperature > 30 && data.temperature <= 35)));
+      updateStatusElement('yellow-led-status', yellowLedStatus);
+      
+      // SMS status
+      const smsStatus = (isDisconnected ? false : (data.sms_sent || false));
+      updateStatusElement('sms-status', smsStatus, smsStatus ? 'SENT' : 'INACTIVE');
+    }
+    
+    function updateStatusElement(id, isOn, text = null) {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = text || (isOn ? 'ON' : 'OFF');
+        element.className = isOn ? 'status-state status-on' : 'status-state status-off';
+      }
+    }
+    
+    function checkAlerts(data, timestamp) {
+      const alertsContainer = document.getElementById('alerts-container');
+      
+      // Clear initialization message if we have real data
+      if (alertsContainer.children.length === 1 && 
+          alertsContainer.children[0].textContent.includes("initialized")) {
+        alertsContainer.innerHTML = '';
+      }
+      
+      // Create new alert if needed
+      let alertType = '';
+      let alertMessage = '';
+      
+      if (data.temperature > 35) {
+        alertType = 'critical';
+        alertMessage = `CRITICAL: High Temperature (${data.temperature.toFixed(1)}°C)`;
+      } 
+      else if (data.temperature > 30) {
+        alertType = 'warning';
+        alertMessage = `WARNING: Elevated Temperature (${data.temperature.toFixed(1)}°C)`;
+      }
+      else if (data.gas > 500) {
+        alertType = 'critical';
+        alertMessage = `CRITICAL: Poor Air Quality (${data.gas} PPM)`;
+      }
+      else if (data.gas > 300) {
+        alertType = 'warning';
+        alertMessage = `WARNING: Moderate Air Quality (${data.gas} PPM)`;
+      }
+      
+      if (alertType) {
+        // Check if this alert already exists
+        const existingAlert = alertHistory.find(a => a.message === alertMessage && a.active);
+        
+        if (!existingAlert) {
+          const alertId = Date.now();
+          const timeStr = timestamp.toLocaleTimeString();
+          
+          const alertHTML = `
+            <div class="alert-item alert-${alertType}" id="alert-${alertId}">
+              <i class="fas ${alertType === 'critical' ? 'fa-fire' : 'fa-thermometer-half'} 
+                 ${alertType}-icon alert-icon"></i>
+              <div class="alert-message">${alertMessage}</div>
+              <div class="alert-time">${timeStr}</div>
+            </div>
+          `;
+          
+          // Add to top of alerts container
+          alertsContainer.insertAdjacentHTML('afterbegin', alertHTML);
+          
+          // Add to alert history
+          alertHistory.push({
+            id: alertId,
+            type: alertType,
+            message: alertMessage,
+            time: timestamp,
+            active: true
+          });
+          
+          // If critical, trigger SMS
+          if (alertType === 'critical') {
+            sendSMSAlert(alertMessage);
+          }
+        }
+      }
+      
+      // Mark old alerts as inactive
+      alertHistory.forEach(alert => {
+        if (alert.active && (
+          (alert.message.includes('Temperature') && data.temperature <= 30) ||
+          (alert.message.includes('Air Quality') && data.gas <= 300)
+        )) {
+          alert.active = false;
+          const alertElement = document.getElementById(`alert-${alert.id}`);
+          if (alertElement) {
+            alertElement.style.opacity = '0.6';
+          }
+        }
+      });
+    }
+    
+    function savePhoneNumber() {
+      const phoneNumber = document.getElementById('alert-phone').value;
+      localStorage.setItem('alertPhoneNumber', phoneNumber);
+    }
+    
+    function loadPhoneNumber() {
+      const savedPhone = localStorage.getItem('alertPhoneNumber');
+      if (savedPhone) {
+        document.getElementById('alert-phone').value = savedPhone;
+      }
+    }
+    
+    async function sendSMSAlert(message) {
+      try {
+        const phoneNumber = document.getElementById('alert-phone').value;
+        
+        if (!phoneNumber || !phoneNumber.startsWith('+')) {
+          console.error('Invalid phone number');
+          updateStatusElement('sms-status', false, 'NO NUMBER');
+          return;
+        }
+        
+        // In a real implementation, you would call your backend service here
+        // For this example, we'll simulate it
+        console.log(`Simulating SMS to ${phoneNumber}: ${message}`);
+        
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Update Firebase (simulated)
+        database.ref('alerts/sms').set({
+          message: message,
+          to: phoneNumber,
+          timestamp: firebase.database.ServerValue.TIMESTAMP,
+          status: "delivered",
+          sid: "simulated_" + Date.now()
+        });
+        
+        // Update UI
+        updateStatusElement('sms-status', true, 'SENT');
+        
+      } catch (error) {
+        console.error('SMS failed:', error);
+        
+        // Update Firebase with failure
+        database.ref('alerts/sms').set({
+          message: message,
+          timestamp: firebase.database.ServerValue.TIMESTAMP,
+          status: "failed",
+          error: error.message
+        });
+        
+        // Update UI
+        updateStatusElement('sms-status', false, 'FAILED');
+      }
+    }
+  </script>
+</body>
+</html>
